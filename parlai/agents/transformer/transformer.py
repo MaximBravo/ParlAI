@@ -304,7 +304,6 @@ class TransformerGeneratorAgent(TorchGeneratorAgent):
 
     Implementation of TorchGeneratorAgent, where the model is a Transformer
     """
-
     @classmethod
     def add_cmdline_args(cls, argparser):
         """

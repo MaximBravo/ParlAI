@@ -157,11 +157,13 @@ def download(url, path, fname, redownload=False, num_retries=5):
     download = not os.path.isfile(outfile) or redownload
     logging.info(f"Downloading {url} to {outfile}")
     retry = num_retries
+    logging.info(f"MAXIM retry = {retry}")
     exp_backoff = [2 ** r for r in reversed(range(retry))]
-
+    logging.info("MAXIM before pbar")
     pbar = tqdm.tqdm(unit='B', unit_scale=True, desc='Downloading {}'.format(fname))
-
+    logging.info("MAXIM after pbar assignment")
     while download and retry > 0:
+        logging.info("MAXIM trying to download in while loop")
         resume_file = outfile + '.part'
         resume = os.path.isfile(resume_file)
         if resume:
@@ -226,6 +228,7 @@ def download(url, path, fname, redownload=False, num_retries=5):
         raise RuntimeError('Connection broken too many times. Stopped retrying.')
 
     if download and retry > 0:
+        logging.info("MAXIM about to do update on pbar obj")
         pbar.update(done - pbar.n)
         if done < total_size:
             raise RuntimeError(

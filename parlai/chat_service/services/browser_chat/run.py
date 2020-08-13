@@ -38,8 +38,10 @@ def run(opt):
     Run BrowserManager.
     """
     opt['service'] = SERVICE_NAME
+    print("MAXIM about to initialize manager")
     manager = BrowserManager(opt)
     try:
+        print("MAXIM about to start task.")
         manager.start_task()
     finally:
         manager.shutdown()

@@ -699,6 +699,7 @@ class TorchAgent(ABC, Agent):
             if not shared:
                 logging.info('Using CUDA')
             if not shared and opt['gpu'] != -1:
+                print("shared and opt[gpu]")
                 torch.cuda.set_device(opt['gpu'])
 
         # whether we're using multi-gpu, a few different ways. these are not
@@ -719,6 +720,7 @@ class TorchAgent(ABC, Agent):
                 self.fp16 = False
 
         if shared is None:
+            print("MAXIM about to build_dictionary()")
             # intitialize any important structures from scratch
             self.dict = self.build_dictionary()
 
@@ -781,8 +783,10 @@ class TorchAgent(ABC, Agent):
         self.is_training = False  # track whether model is training
         self.rank_candidates = opt['rank_candidates']
         self.add_person_tokens = opt.get('person_tokens', False)
+        print("MAXIM before set_interactive_mode")
         # set interactive mode or not according to options.
         self.set_interactive_mode(opt.get('interactive_mode', False), shared)
+        print("MAXIM after set_interactive_mode") # last thing that prints before "Killed"
 
     def build_history(self):
         """

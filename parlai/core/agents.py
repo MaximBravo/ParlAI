@@ -291,6 +291,7 @@ def create_agent_from_opt_file(opt: Opt):
 
     If that file does not exist, return None.
     """
+    print("MAXIM in create_agent_from_opt_file")
     model_file = opt['model_file']
     optfile = model_file + '.opt'
 
@@ -298,7 +299,7 @@ def create_agent_from_opt_file(opt: Opt):
         return None
 
     opt_from_file = Opt.load(optfile)
-
+    print("MAXIM create_agent_from_opt_file after Opt.load()")
     # delete args that we do not want to copy over when loading the model
     for arg in NOCOPY_ARGS:
         if arg in opt_from_file:
@@ -314,9 +315,11 @@ def create_agent_from_opt_file(opt: Opt):
             opt_from_file[k] = v
 
     model_class = load_agent_module(opt_from_file['model'])
-
+    print("MAXIM create_agent_from_opt_file after load_agent_module model_class = " + str(model_class))
     if hasattr(model_class, 'upgrade_opt'):
+        print("MAXIM in upgrade_opt if")
         opt_from_file = model_class.upgrade_opt(opt_from_file)
+        print("MAXIM after upgrade_opt")
 
     # add model arguments to opt_from_file if they aren't in opt_from_file already
     for k, v in opt.items():
@@ -344,7 +347,12 @@ def create_agent_from_opt_file(opt: Opt):
     # if we want to load weights from --init-model, compare opts with
     # loaded ones
     compare_init_model_opts(opt, opt_from_file)
-    return model_class(opt_from_file)
+    print("MAXIM after compare_init_model_opts")
+    print("MAXIM model_class type =", type(model_class))
+    b = model_class(opt_from_file) # this will go to TransformerGeneratorAgent constructor
+    print("NEVER MAKE 2")
+    print("MAXIM after model_class(opt_from_file)")
+    return b
 
 
 def add_datapath_and_model_args(opt: Opt):
@@ -379,10 +387,13 @@ def create_agent(opt: Opt, requireModelExists=False):
     opt['model_file'] + '.opt' must exist and contain a pickled or json dict
     containing the model's options).
     """
+    print("MAXIM in create_agent")
     if opt.get('datapath', None) is None:
+        print("MAXIM create_agent in first if")
         add_datapath_and_model_args(opt)
 
     if opt.get('model_file'):
+        print("MAXIM create_agent in second if")
         opt['model_file'] = modelzoo_path(opt.get('datapath'), opt['model_file'])
         if requireModelExists and not os.path.isfile(opt['model_file']):
             raise RuntimeError(
@@ -391,7 +402,10 @@ def create_agent(opt: Opt, requireModelExists=False):
             )
         # Attempt to load the model from the model file first (this way we do
         # not even have to specify the model name as a parameter)
+        print("MAXIM create_agent before create_agent_from_opt_file")
         model = create_agent_from_opt_file(opt)
+        print("NEVER MAKE IT HERE")
+        print("MAXIM create_agent after create_agent_from_opt_file")
         if model is not None:
             return model
         else:

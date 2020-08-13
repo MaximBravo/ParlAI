@@ -135,8 +135,10 @@ def load_agent_module(agent_path: str):
     :return:
         module of agent
     """
+    print("MAXIM in load_agent_module with agent_path=", agent_path)
     global AGENT_REGISTRY
     if agent_path in AGENT_REGISTRY:
+        print("MAXIM agent_path in AGENT_REGISTRY")
         return AGENT_REGISTRY[agent_path]
 
     repo = 'parlai'
@@ -169,11 +171,13 @@ def load_agent_module(agent_path: str):
         module_name = path_list[0]
         class_name = path_list[1]
     elif '/' in agent_path:
+        print("MAXIM agent_path has '/' in it")
         # e.g. -m my_agent/special_variant
         # will check parlai.agents.my_agent.special_variant:SpecialVariantAgent
         path_list = agent_path.split('/')
         module_name = "%s.agents.%s.%s" % (repo, path_list[0], path_list[1])
         class_name = _name_to_agent_class(path_list[1])
+        print("module_name =", module_name, " class_name =", class_name)
     else:
         # e.g. -m seq2seq
         # will check parlai.agents.seq2seq.agents for Seq2seqAgent first
@@ -187,7 +191,7 @@ def load_agent_module(agent_path: str):
 
     my_module = importlib.import_module(module_name)
     model_class = getattr(my_module, class_name)
-
+    print(f"my_module = {my_module}, model_class = {model_class}")
     return model_class
 
 

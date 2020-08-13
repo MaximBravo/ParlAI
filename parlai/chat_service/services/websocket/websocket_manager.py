@@ -38,6 +38,7 @@ class WebsocketManager(ChatServiceManager):
         """
         Create a WebsocketManager using the given setup options.
         """
+        print("MAXIM inside WebsocketManager constructor")
         super().__init__(opt)
         self.opt = opt
         self.port = opt.get('port')
@@ -51,7 +52,9 @@ class WebsocketManager(ChatServiceManager):
         self.service_reference_id = None
 
         self._parse_config(opt)
+        print("MAXIM before complete setup")
         self._complete_setup()
+        print("MAXIM end of WebsocketManager constructor")
 
     def parse_additional_args(self, opt):
         self.should_load_model = self.config['additional_args'].get('load_model', True)
@@ -64,12 +67,15 @@ class WebsocketManager(ChatServiceManager):
         self.messenger_agent_states = {}
         self.agent_id_to_overworld_future = {}
         self.task_to_agent_ids = {}
+        print("MAXIM before load model")
         self._load_model()
+        print("MAXIM after load model")
 
     def _load_model(self):
         """
         Load model if necessary.
         """
+        print("MAXIM in load model")
         if 'models' in self.opt and self.should_load_model:
             model_params = {}
             model_info = {}
@@ -78,7 +84,10 @@ class WebsocketManager(ChatServiceManager):
                 override = model_opt.get('override', {})
                 if type(override) is list:
                     model_opt['override'] = override[0]
-                model_params[model] = create_agent(model_opt).share()
+                print("MAXIM about to create_agent")
+                a = create_agent(model_opt)
+                print("MAXIM about to share")
+                model_params[model] = a.share();
                 model_info[model] = {'override': override}
             self.runner_opt['model_info'] = model_info
             self.runner_opt['shared_bot_params'] = model_params
