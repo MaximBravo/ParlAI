@@ -168,6 +168,7 @@ class BrowserHandler(BaseHTTPRequestHandler):
             SHARED['ws'].close()
             SHARED['wb'].shutdown()
         json_data = json.dumps(data)
+        print('_interactive_running() json_data =', json_data)
         SHARED['ws'].send(json_data)
 
     def do_HEAD(self):
@@ -183,6 +184,12 @@ class BrowserHandler(BaseHTTPRequestHandler):
         Handle POST request, especially replying to a chat message.
         """
         if self.path == '/interact':
+            print("MAXIM in do_POST")
+            attrs = vars(self)
+            # {'kids': 0, 'name': 'Dog', 'color': 'Spotted', 'age': 10, 'legs': 2, 'smell': 'Alot'}
+            # now dump this in some way or another
+            print(', '.join("%s: %s" % item for item in attrs.items()))
+
             content_length = int(self.headers['Content-Length'])
             body = self.rfile.read(content_length)
             self._interactive_running(body)
@@ -238,6 +245,7 @@ def on_message(ws, message):
     incoming_message = json.loads(message)
     global new_message
     new_message = incoming_message['text']
+    print("In on_message new_message =", new_message)
     message_available.set()
 
 

@@ -96,7 +96,8 @@ class ChatServiceWorldRunner:
         task.world = world
 
         while not world.episode_done() and not self.system_done:
-            ret_val = world.parley()
+            ret_val = world.parley() # Finally got to the main loop! MAXIM
+            # Because of config.yml we know world is of type MessengerBotChatOnboardWorld
             time.sleep(0.3)
         world.shutdown()
         world_data = world.data if hasattr(world, "data") else {}
@@ -125,7 +126,7 @@ class ChatServiceWorldRunner:
             log_utils.print_and_log(
                 logging.INFO, 'Starting task {}...'.format(task_name)
             )
-            return self._run_world(task, world_name, agents)
+            return self._run_world(task, world_name, agents) #interesting line
 
         fut = self.executor.submit(_world_fn)
         task.future = fut

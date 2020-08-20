@@ -35,6 +35,7 @@ class MessengerBotChatTaskWorld(World):
 
     def __init__(self, opt, agent, bot):
         self.agent = agent
+        print("MAXIM type(agent) = " + str(type(agent)))
         self.episodeDone = False
         self.model = bot
         self.first_time = True
@@ -43,6 +44,7 @@ class MessengerBotChatTaskWorld(World):
     def generate_world(opt, agents):
         if opt['models'] is None:
             raise RuntimeError("Model must be specified")
+        print("MAXIM inside generate_world")
         return MessengerBotChatTaskWorld(
             opt,
             agents[0],
@@ -74,7 +76,9 @@ class MessengerBotChatTaskWorld(World):
                 print("===act====")
                 print(a)
                 print("~~~~~~~~~~~")
-                self.model.observe(a)
+                print("MAXIM self.model =", self.model)
+                print("MAXIM get_history_sum()\n", self.model.history.get_history_sum())
+                self.model.observe(a) # MAXIM believe this is the place where the model does something
                 response = self.model.act()
                 print("===response====")
                 print(response)
@@ -97,8 +101,8 @@ class MessengerOverworld(World):
     def __init__(self, opt, agent):
         self.agent = agent
         self.opt = opt
-        self.first_time = True
-        self.episodeDone = False
+        self.first_time = True # True
+        self.episodeDone = False # False
 
     @staticmethod
     def generate_world(opt, agents):

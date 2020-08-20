@@ -543,6 +543,7 @@ class TorchGeneratorAgent(TorchAgent, ABC):
                 self.model, device_ids=device_ids, broadcast_buffers=False
             )
 
+        print("MAXIM The source of all of the resetting is here...in TorchGeneratorAgent __init__ method")
         self.reset()
 
     def build_criterion(self):

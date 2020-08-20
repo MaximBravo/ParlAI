@@ -437,6 +437,7 @@ def create_agent_from_shared(shared_agent):
     """
     opt = copy.deepcopy(shared_agent['opt'])
     a = shared_agent['class'](opt, shared_agent)
+    print("MAXIM created agent")
     return a
 
 

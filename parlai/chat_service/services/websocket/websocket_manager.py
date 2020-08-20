@@ -16,7 +16,7 @@ from parlai.chat_service.core.chat_service_manager import ChatServiceManager
 import parlai.chat_service.utils.logging as log_utils
 import parlai.chat_service.utils.misc as utils
 from parlai.chat_service.services.websocket.sockets import MessageSocketHandler
-from agents import WebsocketAgent
+from parlai.chat_service.services.browser_chat.agents import WebsocketAgent
 import tornado
 from tornado.options import options
 
@@ -40,6 +40,8 @@ class WebsocketManager(ChatServiceManager):
         """
         print("MAXIM inside WebsocketManager constructor")
         super().__init__(opt)
+        print("The setup options for this websocket_manager are:")
+        print(json.dumps(opt, indent=1))
         self.opt = opt
         self.port = opt.get('port')
         self.subs = {}
@@ -173,7 +175,7 @@ class WebsocketManager(ChatServiceManager):
         Begin handling task.
         """
         self.running = True
-        self.app = self._make_app()
+        self.app = self._make_app() # Initializes and returns a tornado application
         self.app.listen(self.port)
         # Must use a tornado callback to run the main loop
         callback_time = utils.THREAD_MEDIUM_SLEEP * 1000

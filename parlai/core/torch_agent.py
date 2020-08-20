@@ -230,6 +230,7 @@ class History(object):
         """
         Clear the history.
         """
+        print("MAXIM someone called reset history...")
         self.history_raw_strings = []
         self.history_strings = []
         self.history_vecs = []
@@ -294,6 +295,41 @@ class History(object):
 
         self.temp_history = temp_history
 
+    def export_history(self):
+        return [self.history_raw_strings, self.history_strings, self.history_vecs, self.temp_history]
+
+    def import_history(self, exported_history):
+        self.history_strings = exported_history[0]
+        self.history_raw_strings = exported_history[1]
+        self.history_vecs = exported_history[2]
+        self.temp_history = exported_history[3]
+
+    def get_history_sum(self):
+        history_sum = "History Summary:\n"
+        if len(self.history_raw_strings) > 0:
+            history_sum += "history_raw_strings = ["
+            for item in self.history_raw_strings[:-1]:
+                history_sum += str(item) + ", "
+            history_sum += str(self.history_raw_strings[-1]) + "]\n"
+        else:
+            history_sum += "history_raw_strings = []\n"
+        if len(self.history_strings) > 0:
+            history_sum += "history_strings = ["
+            for item in self.history_strings[:-1]:
+                history_sum += str(item) + ", "
+            history_sum += str(self.history_strings[-1]) + "]\n"
+        else:
+            history_sum += "history_strings = []\n"
+        if len(self.history_vecs) > 0:
+            history_sum += "history_vecs = ["
+            for item in self.history_vecs[:-1]:
+                history_sum += str(item) + ", "
+            history_sum += str(self.history_vecs[-1]) + "]\n"
+        else:
+            history_sum += "history_vecs = []\n"
+        history_sum += "temp_history = " + str(self.temp_history)
+        return history_sum
+
     def get_history_str(self):
         """
         Return the string version of the history.
@@ -335,7 +371,7 @@ class History(object):
         """
         Return a list of history vecs.
         """
-        return self.history_vecs
+        return self.history_vecss
 
     def _add_person_tokens(self, text, token, add_after_newln=False):
         if add_after_newln:
@@ -783,15 +819,16 @@ class TorchAgent(ABC, Agent):
         self.is_training = False  # track whether model is training
         self.rank_candidates = opt['rank_candidates']
         self.add_person_tokens = opt.get('person_tokens', False)
-        print("MAXIM before set_interactive_mode")
+        # print("MAXIM before set_interactive_mode")
         # set interactive mode or not according to options.
         self.set_interactive_mode(opt.get('interactive_mode', False), shared)
-        print("MAXIM after set_interactive_mode") # last thing that prints before "Killed"
+        # print("MAXIM after set_interactive_mode") # last thing that prints before "Killed"
 
     def build_history(self):
         """
         Return the constructed history object.
         """
+        print("MAXIM about to build history")
         return self.history_class()(
             self.opt,
             maxlen=self.text_truncate,
@@ -1908,6 +1945,7 @@ class TorchAgent(ABC, Agent):
         self.__expecting_clear_history = False
         self.__expecting_to_reply = False
 
+        print("MAXIM Someone has called TorchAgent.reset method...")
         self.observation = None
         self.history.reset()
         self.reset_metrics()

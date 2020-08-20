@@ -14,7 +14,7 @@ opt:
     blender_90M:
       model: transformer/generator
       model_file: zoo:blender/blender_90M/model
-      interactive_mode: True
+      interactive_mode: False
       no_cuda: False
 additional_args:
   page_id: 1 # Configure Your Own Page
