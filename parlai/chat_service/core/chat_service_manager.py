@@ -410,30 +410,28 @@ class ChatServiceManager(ABC):
             message to put on queue
         """
         print("MAXIM New message:", str(message))
+
+        message = self.restructure_message(message)
+        agent_id = message['sender']['id']
+        if not self.world_runner.is_initialized():
+            self.observe_message(
+                agent_id, 'Please wait while the worlds are initializing...'
+            )
+            self.world_runner.init_fut.result()
+
+        if agent_id not in self.messenger_agent_states:
+            self._on_first_message(message)
+            return
+
+        agent_state = self.get_agent_state(agent_id)
+        assert agent_state is not None
         if "type" in message and message['type'] != '':
             message_type = message['type']
             print("recieved message with type", message_type)
-            if message_type == 'export_history':
-                agent_id = message['sender']['id']
-                agent_state = self.get_agent_state(agent_id)
+            if message_type == 'export_history' or message_type == "import_history":
                 agent = agent_state.get_active_agent()
                 agent.put_data(message)
-                pass
         else:
-            message = self.restructure_message(message)
-            agent_id = message['sender']['id']
-            if not self.world_runner.is_initialized():
-                self.observe_message(
-                    agent_id, 'Please wait while the worlds are initializing...'
-                )
-                self.world_runner.init_fut.result()
-
-            if agent_id not in self.messenger_agent_states:
-                self._on_first_message(message)
-                return
-
-            agent_state = self.get_agent_state(agent_id)
-            assert agent_state is not None
             if agent_state.get_active_agent() is None:
                 # return agent to overworld
                 if message.get("text", "") and message['text'].upper() == 'EXIT':

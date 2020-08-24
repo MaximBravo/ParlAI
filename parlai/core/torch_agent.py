@@ -1707,7 +1707,10 @@ class TorchAgent(ABC, Agent):
         if observation['type'] == 'export_history':
             print("type does equal export_history")
             return {'history': self.history.export_history()}
-        print("type does NOT equal export_history")
+        elif observation['type'] == 'import_history':
+            print("type does equal import_history")
+            self.history.import_history(observation['text'])
+            return {'history': 'SUCCESS'}
         observation = Message(observation)
 
         # Sanity check everything is in order
