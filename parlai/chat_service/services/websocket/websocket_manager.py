@@ -254,6 +254,29 @@ class WebsocketManager(ChatServiceManager):
             return
         return loop.run_until_complete(self.subs[socket_id].write_message(message))
 
+    def observe_history(self, socket_id, history):
+        """
+        Send a message through the message manager.
+
+        :param socket_id:
+            int identifier for agent socket to send message to
+        :param history:
+            (str) history to send through the socket.
+        :param quick_replies:
+            (list) list of strings to send as quick replies.
+
+        Returns a tornado future for tracking the `write_message` action.
+        """
+        message = json.dumps(
+            {'history': history}
+        )
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        if socket_id not in self.subs:
+            self.agent_id_to_overworld_future[socket_id].cancel()
+            return
+        return loop.run_until_complete(self.subs[socket_id].write_message(message))
+
     def observe_payload(self, socket_id, payload, quick_replies=None):
         """
         Send a message through the message manager.

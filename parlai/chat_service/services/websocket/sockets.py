@@ -60,6 +60,7 @@ class MessageSocketHandler(WebSocketHandler):
         logging.info('websocket message from client: {}'.format(message_text))
         message = json.loads(message_text)
         message = {
+            'type': message.get('type', ''),
             'text': message.get('text', ''),
             'payload': message.get('payload'),
             'sender': {'id': self.sid},

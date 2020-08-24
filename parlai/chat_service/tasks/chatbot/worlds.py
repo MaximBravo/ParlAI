@@ -78,12 +78,16 @@ class MessengerBotChatTaskWorld(World):
                 print("~~~~~~~~~~~")
                 print("MAXIM self.model =", self.model)
                 print("MAXIM get_history_sum()\n", self.model.history.get_history_sum())
-                self.model.observe(a) # MAXIM believe this is the place where the model does something
-                response = self.model.act()
-                print("===response====")
-                print(response)
-                print("~~~~~~~~~~~")
-                self.agent.observe(response)
+                observe_response = self.model.observe(a) # MAXIM believe this is the place where the model does something
+                print("Observe_response is:", str(observe_response))
+                if 'history' in observe_response:
+                    self.agent.observe(observe_response)
+                else:
+                    response = self.model.act()
+                    print("===response====")
+                    print(response)
+                    print("~~~~~~~~~~~")
+                    self.agent.observe(response)
 
     def episode_done(self):
         return self.episodeDone

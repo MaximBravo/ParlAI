@@ -409,47 +409,58 @@ class ChatServiceManager(ABC):
         :param message:
             message to put on queue
         """
-        message = self.restructure_message(message)
-        agent_id = message['sender']['id']
-        if not self.world_runner.is_initialized():
-            self.observe_message(
-                agent_id, 'Please wait while the worlds are initializing...'
-            )
-            self.world_runner.init_fut.result()
-
-        if agent_id not in self.messenger_agent_states:
-            self._on_first_message(message)
-            return
-
-        agent_state = self.get_agent_state(agent_id)
-        assert agent_state is not None
-        if agent_state.get_active_agent() is None:
-            # return agent to overworld
-            if message.get("text", "") and message['text'].upper() == 'EXIT':
-                # remove agent from agent_pool
-                to_remove = []
-                for world_type, _time in agent_state.time_in_pool.items():
-                    to_remove.append(world_type)
-                for world_type in to_remove:
-                    self.remove_agent_from_pool(
-                        agent_state, world_type, mark_removed=False
-                    )
-                self.after_agent_removed(agent_state.get_id())
-                agent_state.set_active_agent(agent_state.get_overworld_agent())
-            else:
-                self.observe_message(
-                    agent_id,
-                    'Please wait while we pair you with another person. '
-                    'If you wish to exit, type *EXIT*.',
-                )
-                self.sender.typing_on(agent_id)  # type: ignore
+        print("MAXIM New message:", str(message))
+        if "type" in message and message['type'] != '':
+            message_type = message['type']
+            print("recieved message with type", message_type)
+            if message_type == 'export_history':
+                agent_id = message['sender']['id']
+                agent_state = self.get_agent_state(agent_id)
+                agent = agent_state.get_active_agent()
+                agent.put_data(message)
+                pass
         else:
-            # If an agent is in a solo world, we can put a typing indicator
-            # and mark the message as read
-            agent = agent_state.get_active_agent()
-            if len(agent.message_partners) == 0:
-                self.handle_bot_read(agent.id)  # type: ignore
-            agent.put_data(message)
+            message = self.restructure_message(message)
+            agent_id = message['sender']['id']
+            if not self.world_runner.is_initialized():
+                self.observe_message(
+                    agent_id, 'Please wait while the worlds are initializing...'
+                )
+                self.world_runner.init_fut.result()
+
+            if agent_id not in self.messenger_agent_states:
+                self._on_first_message(message)
+                return
+
+            agent_state = self.get_agent_state(agent_id)
+            assert agent_state is not None
+            if agent_state.get_active_agent() is None:
+                # return agent to overworld
+                if message.get("text", "") and message['text'].upper() == 'EXIT':
+                    # remove agent from agent_pool
+                    to_remove = []
+                    for world_type, _time in agent_state.time_in_pool.items():
+                        to_remove.append(world_type)
+                    for world_type in to_remove:
+                        self.remove_agent_from_pool(
+                            agent_state, world_type, mark_removed=False
+                        )
+                    self.after_agent_removed(agent_state.get_id())
+                    agent_state.set_active_agent(agent_state.get_overworld_agent())
+                else:
+                    self.observe_message(
+                        agent_id,
+                        'Please wait while we pair you with another person. '
+                        'If you wish to exit, type *EXIT*.',
+                    )
+                    self.sender.typing_on(agent_id)  # type: ignore
+            else:
+                # If an agent is in a solo world, we can put a typing indicator
+                # and mark the message as read
+                agent = agent_state.get_active_agent()
+                if len(agent.message_partners) == 0:
+                    self.handle_bot_read(agent.id)  # type: ignore
+                agent.put_data(message)
 
     def add_agent_to_pool(self, agent: AgentState, world_type: str = 'default'):
         """

@@ -41,6 +41,8 @@ class WebsocketAgent(ChatServiceAgent):
         quick_replies = act.get('quick_replies', None)
         if act.get('payload', None):
             self.manager.observe_payload(self.id, act['payload'], quick_replies)
+        elif act.get('history', None):
+            self.manager.observe_history(self.id, act['history'])
         else:
             self.manager.observe_message(self.id, act['text'], quick_replies)
 
@@ -55,6 +57,7 @@ class WebsocketAgent(ChatServiceAgent):
         logging.info(f"Received new message: {message}")
         action = {
             'episode_done': False,
+            'type': message.get('type', ''),
             'text': message.get('text', ''),
             'payload': message.get('payload'),
         }

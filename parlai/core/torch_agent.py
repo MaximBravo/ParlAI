@@ -1703,6 +1703,11 @@ class TorchAgent(ABC, Agent):
         # TODO: Migration plan: TorchAgent currently supports being passed
         # observations as vanilla dicts for legacy interop; eventually we
         # want to remove this behavior and demand that teachers return Messages
+        print("MAXIM Observation is:", str(observation))
+        if observation['type'] == 'export_history':
+            print("type does equal export_history")
+            return {'history': self.history.export_history()}
+        print("type does NOT equal export_history")
         observation = Message(observation)
 
         # Sanity check everything is in order
