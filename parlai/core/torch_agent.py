@@ -226,6 +226,10 @@ class History(object):
         """
         return self.dict.txt2vec(text)
 
+    def generate_history_vecs(self):
+        for turn in self.history_strings:
+            self.history_vecs.append(self.dict.txt2vec(turn))
+
     def reset(self):
         """
         Clear the history.
@@ -300,9 +304,11 @@ class History(object):
 
     def import_history(self, exported_history):
         self.history_strings = exported_history[0]
-        self.history_raw_strings = exported_history[1]
-        self.history_vecs = exported_history[2]
-        self.temp_history = exported_history[3]
+        self.history_raw_strings = exported_history[0] #used to be [1]
+        self.generate_history_vecs()
+        # self.history_vecs = exported_history[2]
+        # self.temp_history = exported_history[3]
+        self.temp_history = None
 
     def get_history_sum(self):
         history_sum = "History Summary:\n"
