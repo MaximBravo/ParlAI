@@ -9,7 +9,7 @@
 from parlai.core.worlds import World
 from parlai.chat_service.services.messenger.worlds import OnboardWorld
 from parlai.core.agents import create_agent_from_shared
-
+import os
 
 # ---------- Chatbot demo ---------- #
 class MessengerBotChatOnboardWorld(OnboardWorld):
@@ -29,9 +29,10 @@ class MessengerBotChatTaskWorld(World):
     """
     Example one person world that talks to a provided agent (bot).
     """
+    os.environ["CUDA_VISIBLE_DEVICES"]="" # uncomment to enable cuda
 
     MAX_AGENTS = 1
-    MODEL_KEY = 'blender_3B' #'blender_90M'
+    MODEL_KEY = 'blender_9B' #'blender_90M'
 
     def __init__(self, opt, agent, bot):
         self.agent = agent
