@@ -59,6 +59,7 @@ class InteractiveWorld(DialogPartnerWorld):
             context_act = Message(
                 {'id': 'context', 'text': self.p1, 'episode_done': False}
             )
+            print("MAXIM context_act is with text:" + self.p1 + ", agents[0] = " + agents[0])
             agents[0].observe(validate(context_act))
         try:
             act = deepcopy(agents[0].act())

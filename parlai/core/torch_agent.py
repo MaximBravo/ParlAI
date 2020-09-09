@@ -208,6 +208,7 @@ class History(object):
 
         # set up history objects
         self.max_len = maxlen
+        print("MAXIM Max length of History is", self.max_len)
 
         self.history_strings = []
         self.history_raw_strings = []
