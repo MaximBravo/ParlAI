@@ -143,3 +143,4 @@ heroku-cli-*
 
 # mypy cache
 .mypy_cache
+QuantizationNotebook/data.zip
