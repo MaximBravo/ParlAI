@@ -484,7 +484,20 @@ class TorchGeneratorAgent(TorchAgent, ABC):
         self.output_token_losses = opt.get('verbose', False)
         self.compute_tokenized_bleu = opt.get('compute_tokenized_bleu', False)
         self.beam_block_list: Optional[SearchBlocklist] = None
+        # print("init_model type is ", str(type(init_model)))
+        # Quantization never worked
+        if False:
+            # set quantization config for server (x86)
+            self.model.qconfig = torch.quantization.default_qconfig# get_default_qconfig('fbgemm')
+            print("self.model.qconfig:", self.model.qconfig)
+            # torch.backends.quantized.engine = 'fbgemm' # gotten from https://pytorch.org/docs/stable/quantization.html second note
 
+            # insert observers
+            torch.quantization.prepare(self.model, inplace=True)
+            # Calibrate the model and collect statistics
+            self.model.eval()
+            # convert to quantized version
+            torch.quantization.convert(self.model, inplace=True)
         if shared:
             # set up shared properties
             states = shared.get('states', {})
@@ -494,8 +507,10 @@ class TorchGeneratorAgent(TorchAgent, ABC):
             self.criterion = self.build_criterion()
             # ensure all distributed copies will always be in sync
             self.model = self.build_model()
-            print("~~~~~~~~~MAXIM~~~~~~~~~~~~")
+            print("~~~~~~~~~MAXIM~~~~~~~~~~~~ type(self.model) = " + str(type(self.model)))
             print("MAXIM: Torch version:", torch.__version__)
+            print("MAXIM: let us see usage with fp16 on.")
+            self.model = self.model.half()
 
             # load the block_list for beam search
             self.beam_block_list = self._load_beam_block_list()
@@ -518,21 +533,9 @@ class TorchGeneratorAgent(TorchAgent, ABC):
                 f"Total parameters: {total_params:,d} ({train_params:,d} trainable)"
             )
 
-            if self.fp16:
-                self.model = self.model.half()
-
-            if False:
-                # set quantization config for server (x86)
-                self.model.qconfig = torch.quantization.default_qconfig# get_default_qconfig('fbgemm')
-                print("self.model.qconfig:", self.model.qconfig)
-                # torch.backends.quantized.engine = 'fbgemm' # gotten from https://pytorch.org/docs/stable/quantization.html second note
-
-                # insert observers
-                torch.quantization.prepare(self.model, inplace=True)
-                # Calibrate the model and collect statistics
-                self.model.eval()
-                # convert to quantized version
-                torch.quantization.convert(self.model, inplace=True)
+            # if not self.fp16:
+            # print("MAXIM: let us see usage with fp16 on.")
+            # self.model = self.model.half()
 
             if init_model is not None:
                 # load model parameters if available

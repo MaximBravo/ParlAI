@@ -434,14 +434,14 @@ while also improving numerical accuracy. While this can be used with any model, 
 especially common with quantized models.
 """
 
-print('\n Inverted Residual Block: Before fusion \n\n', float_model.features[1].conv)
+# print('\n Inverted Residual Block: Before fusion \n\n', float_model.features[1].conv)
 float_model.eval()
 
 # Fuses modules
 float_model.fuse_model()
 
 # Note fusion of Conv+BN+Relu and Conv+Relu
-print('\n Inverted Residual Block: After fusion\n\n',float_model.features[1].conv)
+# print('\n Inverted Residual Block: After fusion\n\n',float_model.features[1].conv)
 
 """Finally to get a "baseline" accuracy, let's see the accuracy of our un-quantized model
 with fused modules
@@ -491,7 +491,7 @@ torch.quantization.prepare(myModel, inplace=True)
 
 # Calibrate first
 print('Post Training Quantization Prepare: Inserting Observers')
-print('\n Inverted Residual Block:After observer insertion \n\n', myModel.features[1].conv)
+# print('\n Inverted Residual Block:After observer insertion \n\n', myModel.features[1].conv)
 
 # Calibrate with the training set
 evaluate(myModel, criterion, data_loader, neval_batches=num_calibration_batches)
@@ -500,7 +500,7 @@ print('Post Training Quantization: Calibration done')
 # Convert to quantized model
 torch.quantization.convert(myModel, inplace=True)
 print('Post Training Quantization: Convert done')
-print('\n Inverted Residual Block: After fusion and quantization, note fused modules: \n\n',myModel.features[1].conv)
+# print('\n Inverted Residual Block: After fusion and quantization, note fused modules: \n\n',myModel.features[1].conv)
 
 print("Size of model after quantization")
 print_size_of_model(myModel)
