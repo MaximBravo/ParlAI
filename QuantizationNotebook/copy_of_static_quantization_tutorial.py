@@ -416,8 +416,8 @@ def prepare_data_loaders(data_path):
 
 #!unzip data/imagenet_1k_data.zip -d data
 
-data_path = 'data/imagenet_1k'
-saved_model_dir = 'data/'
+data_path = 'data_tutorial/imagenet_1k'
+saved_model_dir = 'data_tutorial/'
 float_model_file = 'mobilenet_pretrained_float.pth'
 scripted_float_model_file = 'mobilenet_quantization_scripted.pth'
 scripted_quantized_model_file = 'mobilenet_quantization_scripted_quantized.pth'

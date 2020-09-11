@@ -11,10 +11,10 @@ max_workers: 30
 opt:
   debug: True
   models:
-    blender_9B:
+    blender_3B:
       model: transformer/generator
-      model_file: zoo:blender/blender_9B/model
+      model_file: zoo:blender/blender_3B/model
       interactive_mode: False
-      no_cuda: True
+      no_cuda: False
 additional_args:
   page_id: 1 # Configure Your Own Page

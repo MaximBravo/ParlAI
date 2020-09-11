@@ -29,10 +29,10 @@ class MessengerBotChatTaskWorld(World):
     """
     Example one person world that talks to a provided agent (bot).
     """
-    os.environ["CUDA_VISIBLE_DEVICES"]="" # uncomment to enable cuda
+    os.environ["CUDA_VISIBLE_DEVICES"]="" # uncomment to force CPU
 
     MAX_AGENTS = 1
-    MODEL_KEY = 'blender_9B' #'blender_90M'
+    MODEL_KEY = 'blender_3B' #'blender_90M'
 
     def __init__(self, opt, agent, bot):
         self.agent = agent

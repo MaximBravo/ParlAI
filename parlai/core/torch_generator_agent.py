@@ -25,6 +25,7 @@ from operator import attrgetter
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.quantization
 
 from parlai.core.opt import Opt
 from parlai.utils.distributed import is_distributed, sync_parameters
@@ -493,6 +494,8 @@ class TorchGeneratorAgent(TorchAgent, ABC):
             self.criterion = self.build_criterion()
             # ensure all distributed copies will always be in sync
             self.model = self.build_model()
+            print("~~~~~~~~~MAXIM~~~~~~~~~~~~")
+            print("MAXIM: Torch version:", torch.__version__)
 
             # load the block_list for beam search
             self.beam_block_list = self._load_beam_block_list()
@@ -517,6 +520,19 @@ class TorchGeneratorAgent(TorchAgent, ABC):
 
             if self.fp16:
                 self.model = self.model.half()
+
+            if False:
+                # set quantization config for server (x86)
+                self.model.qconfig = torch.quantization.default_qconfig# get_default_qconfig('fbgemm')
+                print("self.model.qconfig:", self.model.qconfig)
+                # torch.backends.quantized.engine = 'fbgemm' # gotten from https://pytorch.org/docs/stable/quantization.html second note
+
+                # insert observers
+                torch.quantization.prepare(self.model, inplace=True)
+                # Calibrate the model and collect statistics
+                self.model.eval()
+                # convert to quantized version
+                torch.quantization.convert(self.model, inplace=True)
 
             if init_model is not None:
                 # load model parameters if available
