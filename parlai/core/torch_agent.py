@@ -208,7 +208,7 @@ class History(object):
 
         # set up history objects
         self.max_len = maxlen
-        print("MAXIM Max length of History is", self.max_len)
+        # print("MAXIM Max length of History is", self.max_len)
 
         self.history_strings = []
         self.history_raw_strings = []
@@ -235,7 +235,7 @@ class History(object):
         """
         Clear the history.
         """
-        print("MAXIM someone called reset history...")
+        # print("MAXIM someone called reset history...")
         self.history_raw_strings = []
         self.history_strings = []
         self.history_vecs = []
@@ -763,7 +763,7 @@ class TorchAgent(ABC, Agent):
                 self.fp16 = False
 
         if shared is None:
-            print("MAXIM about to build_dictionary()")
+            # print("MAXIM about to build_dictionary()")
             # intitialize any important structures from scratch
             self.dict = self.build_dictionary()
 
@@ -835,7 +835,7 @@ class TorchAgent(ABC, Agent):
         """
         Return the constructed history object.
         """
-        print("MAXIM about to build history")
+        # print("MAXIM about to build history")
         return self.history_class()(
             self.opt,
             maxlen=self.text_truncate,
@@ -1961,7 +1961,7 @@ class TorchAgent(ABC, Agent):
         self.__expecting_clear_history = False
         self.__expecting_to_reply = False
 
-        print("MAXIM Someone has called TorchAgent.reset method...")
+        # print("MAXIM Someone has called TorchAgent.reset method...")
         self.observation = None
         self.history.reset()
         self.reset_metrics()

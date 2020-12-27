@@ -128,7 +128,7 @@ def padded_tensor(
         # print("MAXIM using cuda")
         # print("torch.cuda.get_device_name(0) =", torch.cuda.get_device_name(0));
         if device >= 0:
-            print("MAXIM device >= 0 in fact " + str(device))
+            # print("MAXIM device >= 0 in fact " + str(device))
             output = output.to(device)
     return output, lens
 

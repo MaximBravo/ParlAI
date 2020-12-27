@@ -387,7 +387,7 @@ def create_agent(opt: Opt, requireModelExists=False):
     opt['model_file'] + '.opt' must exist and contain a pickled or json dict
     containing the model's options).
     """
-    print("MAXIM in create_agent")
+    # print("MAXIM in create_agent")
     if opt.get('datapath', None) is None:
         print("MAXIM create_agent in first if")
         add_datapath_and_model_args(opt)
@@ -437,7 +437,7 @@ def create_agent_from_shared(shared_agent):
     """
     opt = copy.deepcopy(shared_agent['opt'])
     a = shared_agent['class'](opt, shared_agent)
-    print("MAXIM created agent")
+    # print("MAXIM created agent")
     return a
 
 

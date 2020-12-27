@@ -27,6 +27,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.quantization
 
+import os
+
 from parlai.core.opt import Opt
 from parlai.utils.distributed import is_distributed, sync_parameters
 from parlai.core.torch_agent import TorchAgent, Batch, Output, DictionaryAgent
@@ -473,7 +475,11 @@ class TorchGeneratorAgent(TorchAgent, ABC):
     def __init__(self, opt: Opt, shared=None):
         init_model, is_finetune = self._get_init_model(opt, shared)
         super().__init__(opt, shared)
-
+        
+        # print("MAXIM: Setting use CUDA to false")
+        # self.use_cuda = False
+        
+        # os.environ["CUDA_VISIBLE_DEVICES"]="" # uncomment to force CPU
         self.beam_size = opt.get('beam_size', 1)
         self.beam_min_length = opt.get('beam_min_length', 1)
         self.beam_block_ngram = opt.get('beam_block_ngram', -1)
@@ -509,8 +515,9 @@ class TorchGeneratorAgent(TorchAgent, ABC):
             self.model = self.build_model()
             print("~~~~~~~~~MAXIM~~~~~~~~~~~~ type(self.model) = " + str(type(self.model)))
             print("MAXIM: Torch version:", torch.__version__)
-            print("MAXIM: let us see usage with fp16 on.")
-            self.model = self.model.half()
+            # print("MAXIM: let us see usage with fp16 on.")
+            # self.model = self.model.half()
+            
 
             # load the block_list for beam search
             self.beam_block_list = self._load_beam_block_list()
@@ -533,9 +540,9 @@ class TorchGeneratorAgent(TorchAgent, ABC):
                 f"Total parameters: {total_params:,d} ({train_params:,d} trainable)"
             )
 
-            # if not self.fp16:
-            # print("MAXIM: let us see usage with fp16 on.")
-            # self.model = self.model.half()
+            if self.fp16:
+                print("MAXIM: self.fp16 is true")
+                self.model = self.model.half()
 
             if init_model is not None:
                 # load model parameters if available
@@ -562,7 +569,7 @@ class TorchGeneratorAgent(TorchAgent, ABC):
                 self.model, device_ids=device_ids, broadcast_buffers=False
             )
 
-        print("MAXIM The source of all of the resetting is here...in TorchGeneratorAgent __init__ method")
+        # print("MAXIM The source of all of the resetting is here...in TorchGeneratorAgent __init__ method")
         self.reset()
 
     def build_criterion(self):
