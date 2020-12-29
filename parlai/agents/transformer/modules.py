@@ -279,10 +279,10 @@ def create_position_codes(n_pos, dim, out):
         ]
     )
 
-    out[:, 0::2] = torch.FloatTensor(np.sin(position_enc)).type_as(out)
-    out[:, 1::2] = torch.FloatTensor(np.cos(position_enc)).type_as(out)
     out.detach_()
     out.requires_grad = False
+    out[:, 0::2] = torch.FloatTensor(np.sin(position_enc)).type_as(out)
+    out[:, 1::2] = torch.FloatTensor(np.cos(position_enc)).type_as(out)
 
 
 class TransformerResponseWrapper(nn.Module):
@@ -579,7 +579,7 @@ class TransformerEncoder(nn.Module):
             The input IDs
         :param LongTensor[batch,seqlen] positions:
             Positions for input IDs
-        :param LongTensor[batch,seqlen]:
+        :param LongTensor[batch,seqlen] segments:
             If provided, additionally adds ``segments`` as extra embedding features.
         """
         # embed input
@@ -664,7 +664,7 @@ class TransformerEncoderLayer(nn.Module):
         residual = tensor
         if self.variant == 'prelayernorm':
             tensor = _normalize(tensor, self.norm1)
-        attended_tensor, _ = self.attention(tensor, mask=mask)
+        attended_tensor = self.attention(tensor, mask=mask)[0]
         tensor = residual + self.dropout(attended_tensor)
         if self.variant == 'aiayn' or self.variant == 'xlm' or self.variant == 'bart':
             tensor = _normalize(tensor, self.norm1)
@@ -820,6 +820,45 @@ class TransformerDecoder(nn.Module):
 
         return tensor
 
+    def forward_layers(
+        self,
+        tensor: torch.Tensor,
+        encoder_output: torch.Tensor,
+        encoder_mask: torch.Tensor,
+        incr_state: Dict[int, torch.Tensor],
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """
+        Forward pass of decoder layers.
+
+        :param tensor:
+            embedded input tensor for the decoder
+        :param enc_out:
+            encoder outputs
+        :param enc_mask:
+            encoder output mask
+        :param incr_state:
+            Dict mapping layer_idx to incremental state
+
+        :return (tensor, new_incr_state):
+            return encoding after applying decoder layers, as well
+            as new incremental decoding state.
+        """
+        new_incr_state = {}
+        if getattr(self.layers, 'is_model_parallel', False):
+            tensor, new_incr_state = self._apply_model_parallel(
+                tensor, encoder_output, encoder_mask, incr_state
+            )
+        else:
+            for idx, layer in enumerate(self.layers):
+                tensor, new_incr_state[idx] = layer(
+                    x=tensor,
+                    encoder_output=encoder_output,
+                    encoder_mask=encoder_mask,
+                    incr_state=incr_state.get(idx),
+                )
+
+        return tensor, new_incr_state
+
     def forward(self, input, encoder_state, incr_state=None):
         """
         Forward pass.
@@ -850,19 +889,9 @@ class TransformerDecoder(nn.Module):
 
         tensor = self.dropout(tensor)  # --dropout
 
-        new_incr_state = {}
-        if getattr(self.layers, 'is_model_parallel', False):
-            tensor, new_incr_state = self._apply_model_parallel(
-                tensor, encoder_output, encoder_mask, incr_state
-            )
-        else:
-            for idx, layer in enumerate(self.layers):
-                tensor, new_incr_state[idx] = layer(
-                    x=tensor,
-                    encoder_output=encoder_output,
-                    encoder_mask=encoder_mask,
-                    incr_state=incr_state.get(idx),
-                )
+        tensor, new_incr_state = self.forward_layers(
+            tensor, encoder_output, encoder_mask, incr_state
+        )
 
         if self.variant == 'prelayernorm':
             tensor = _normalize(tensor, self.norm_embeddings)
@@ -965,7 +994,7 @@ class TransformerDecoderLayer(nn.Module):
             mask=decoder_mask,
             incr_state=incr_state.get('self_attn'),
             static_kv=False,
-        )
+        )[:2]
         x = self.dropout(x)  # --dropout
         x = x + residual
         if self.variant == 'aiayn' or self.variant == 'xlm' or self.variant == 'bart':
@@ -982,7 +1011,7 @@ class TransformerDecoderLayer(nn.Module):
             mask=encoder_mask,
             incr_state=incr_state.get('encoder_attn'),
             static_kv=True,
-        )
+        )[:2]
         x = self.dropout(x)  # --dropout
         x = residual + x
         if self.variant == 'aiayn' or self.variant == 'xlm' or self.variant == 'bart':
@@ -1229,7 +1258,7 @@ class BasicAttention(nn.Module):
         if mask_ys is not None:
             attn_mask = (mask_ys == 0).view(bsz, 1, y_len)
             attn_mask = attn_mask.repeat(1, x_len, 1)
-            l1.masked_fill(attn_mask, neginf(l1.dtype))
+            l1.masked_fill_(attn_mask, neginf(l1.dtype))
         l2 = F.softmax(l1, dim=self.dim, dtype=torch.float).type_as(l1)
         if values is None:
             values = ys
@@ -1280,7 +1309,7 @@ class MultiHeadAttention(nn.Module):
         mask: torch.Tensor = None,
         incr_state: Optional[Dict[str, torch.Tensor]] = None,
         static_kv: bool = False,
-    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor], torch.Tensor]:
         """
         Forward pass.
 
@@ -1291,12 +1320,16 @@ class MultiHeadAttention(nn.Module):
           means we are blocking it. Mask is:
           - [B, key_len] (encoder self-attn and decoder enc/dec attn)
           - [B, query_len, key_len] (decoder self-attn)
-          - [B, 1, 1] (decoder self-attn with incr_state caching)
+          - [B, 1, key_len] (decoder self-attn with incr_state caching)
         :param incr_state: dictionary with values representing the previous states of
           the key, value, and mask
         :param static_kv: True if the key and value are held constant during decoding
           (as in encoder/decoder attention)
-        :return: (final attended tensor, new incremental state)
+        :return: (
+          final attended tensor,
+          new incremental state,
+          key/value-multiplied tensor before softmax,
+        )
         """
 
         batch_size, query_len, dim = query.size()
@@ -1405,7 +1438,7 @@ class MultiHeadAttention(nn.Module):
 
         out = self.out_lin(attentioned)
 
-        return out, new_incr_state
+        return out, new_incr_state, dot_prod
 
     def reorder_incremental_state(
         self, incremental_state: Dict[str, torch.Tensor], inds: torch.Tensor

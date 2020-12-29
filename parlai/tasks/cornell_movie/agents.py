@@ -4,8 +4,9 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from parlai.core.teachers import FbDialogTeacher
+from parlai.core.teachers import FbDeprecatedDialogTeacher
 from .build import build
+from parlai.utils.data import DatatypeHelper
 
 import copy
 import os
@@ -18,18 +19,51 @@ def _path(opt, filtered):
     return os.path.join(opt['datapath'], 'CornellMovie', dt + filtered + '.txt')
 
 
-class DefaultTeacher(FbDialogTeacher):
+class DefaultTeacher(FbDeprecatedDialogTeacher):
     def __init__(self, opt, shared=None):
         opt = copy.deepcopy(opt)
         opt['datafile'] = _path(opt, '')
         opt['cands_datafile'] = opt['datafile']
+        self.fold = DatatypeHelper.fold(opt['datatype'])
         super().__init__(opt, shared)
+
+    def num_examples(self):
+        if self.fold == 'train':
+            return 133125
+        elif self.fold == 'valid':
+            return 16759
+        elif self.fold == 'test':
+            return 16611
+
+    def num_episodes(self):
+        if self.fold == 'train':
+            return 66478
+        elif self.fold == 'valid':
+            return 8310
+        elif self.fold == 'test':
+            return 8309
 
 
 class DoubleTeacher(DefaultTeacher):
     """
     This version creates text-label pairs from the perspective of both speakers.
     """
+
+    def num_examples(self):
+        if self.fold == 'train':
+            return 176975
+        elif self.fold == 'valid':
+            return 22349
+        elif self.fold == 'test':
+            return 22013
+
+    def num_episodes(self):
+        if self.fold == 'train':
+            return 102401
+        elif self.fold == 'valid':
+            return 12806
+        elif self.fold == 'test':
+            return 12790
 
     def _rebuild(self, entries):
         new_list = []

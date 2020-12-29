@@ -4,12 +4,16 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from parlai.core.teachers import FixedDialogTeacher, DialogTeacher, ParlAIDialogTeacher
-from .build import build
-
 import copy
 import json
 import os
+
+from parlai.core.message import Message
+from parlai.core.opt import Opt
+from parlai.core.teachers import FixedDialogTeacher, DialogTeacher, ParlAIDialogTeacher
+from parlai.tasks.wrapper.agents import AbstractWrapperTeacher
+from parlai.utils.io import PathManager
+from .build import build
 
 
 def get_sentence_tokenizer():
@@ -84,7 +88,7 @@ class IndexTeacher(FixedDialogTeacher):
         return action
 
     def _setup_data(self, path):
-        with open(path) as data_file:
+        with PathManager.open(path) as data_file:
             self.squad = json.load(data_file)['data']
         self.examples = []
 
@@ -119,7 +123,7 @@ class DefaultTeacher(DialogTeacher):
 
     def setup_data(self, path):
         print('loading: ' + path)
-        with open(path) as data_file:
+        with PathManager.open(path) as data_file:
             self.squad = json.load(data_file)['data']
         for article in self.squad:
             # each paragraph is a context for the attached questions
@@ -154,7 +158,7 @@ class OpensquadTeacher(DialogTeacher):
 
     def setup_data(self, path):
         print('loading: ' + path)
-        with open(path) as data_file:
+        with PathManager.open(path) as data_file:
             self.squad = json.load(data_file)['data']
         for article in self.squad:
             # each paragraph is a context for the attached questions
@@ -187,7 +191,7 @@ class TitleTeacher(DefaultTeacher):
 
     def setup_data(self, path):
         print('loading: ' + path)
-        with open(path) as data_file:
+        with PathManager.open(path) as data_file:
             self.squad = json.load(data_file)['data']
         for article in self.squad:
             title = article['title']
@@ -371,3 +375,25 @@ class FulldocsentenceTeacher(FulldocTeacher):
             del action['context']
 
         return action
+
+
+class SquadQATeacher(AbstractWrapperTeacher):
+    """
+    Wrapper Teacher over SQuAD to get only the passage, and ignore the question.
+    """
+
+    @classmethod
+    def add_cmdline_args(cls, parser):
+        parser.set_defaults(wrapper_task='squad')
+
+    def __init__(self, opt: Opt, shared=None):
+        super().__init__(opt, shared)
+
+    def _edit_action(self, act: Message) -> Message:
+
+        """
+        # SQuAD returns passage and question both, only passage required for task.
+        """
+        passage = act['text'].split('\n')[0]
+        act.force_set('text', passage)
+        return act

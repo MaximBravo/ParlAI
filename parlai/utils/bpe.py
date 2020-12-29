@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 import json
 import os
+import random
 import re
 from typing import Dict, List, Optional, Set, Tuple
 from typing_extensions import final
@@ -21,6 +22,7 @@ from parlai.core.build_data import download, make_dir
 from parlai.core.opt import Opt
 from parlai.utils.misc import warn_once
 from parlai.utils.typing import TShared
+from parlai.utils.io import PathManager
 import parlai.utils.logging as logging
 
 try:
@@ -106,6 +108,9 @@ class BPEHelper(ABC):
         self.opt = opt
         self.debug = opt.get('bpe_debug', False)
         self.add_prefix_space = opt.get('bpe_add_prefix_space', False)
+        self._special_tokens: Dict[str, int] = {}
+        self.bpe_dropout: Optional[float] = opt.get('bpe_dropout')
+        self._bpe_dropout_enabled = False
 
     @staticmethod
     def add_cmdline_args(argparser):
@@ -123,13 +128,18 @@ class BPEHelper(ABC):
             help='add prefix space before encoding',
         )
         parser.add_argument(
-            '--hf-skip-special-tokens',
-            hidden=True,
-            type='bool',
-            default=True,
-            help='do not decode special tokens with bytelevelbpe',
+            '--bpe-dropout',
+            type=float,
+            default=None,
+            help='Use BPE dropout during training.',
         )
         return parser
+
+    def enable_bpe_dropout(self, enabled: bool):
+        """
+        Used to toggle BPE dropout on (True) or off (False).
+        """
+        self._bpe_dropout_enabled = enabled
 
     @final
     def encode(self, text: str) -> List[str]:
@@ -146,6 +156,15 @@ class BPEHelper(ABC):
         :return tokens:
             A list of tokens
         """
+        for special_token in self._special_tokens.keys():
+            split = text.split(special_token)
+            if len(split) > 1:
+                output = []
+                for i, piece in enumerate(split):
+                    if i > 0:
+                        output.append(special_token)
+                    output += self.encode(piece)
+                return output
         if self.add_prefix_space and not isinstance(self, HuggingFaceBpeHelper):
             text = f' {text}'
         return self.helper_encode(text)
@@ -165,7 +184,9 @@ class BPEHelper(ABC):
         """
 
     @final
-    def decode(self, tokens: List[str], token_ids: List[int], delimiter: str) -> str:
+    def decode(
+        self, tokens: List[str], token_ids: List[int], delimiter: str = ' '
+    ) -> str:
         """
         Decode list of tokens into a text string.
 
@@ -181,12 +202,30 @@ class BPEHelper(ABC):
         :return text:
             decoded text
         """
-        text = delimiter.join(tokens)
-        if not self.debug:
-            text = self.helper_decode(tokens, token_ids, delimiter)
-            if self.add_prefix_space:
-                assert text.startswith(' ')
-                text = text.lstrip(' ')
+        if self.debug:
+            return delimiter.join(tokens)
+
+        for i, token in enumerate(tokens):
+            # note, HF ByteLevelBPE tokenizer handles special tokens itself in
+            # a special way, so this will be skipped
+            if token in self._special_tokens:
+                # special token found. to the left, we've already cleared
+                left = self.helper_decode(tokens[:i], token_ids[:i], delimiter)
+                # token itself is easy to map to a string
+                center = token
+                # to the right, there may stil be special tokens
+                right = self.decode(
+                    tokens[min(len(token_ids), i + 1) :],
+                    token_ids[min(len(token_ids), i + 1) :],
+                    delimiter,
+                )
+                return left + center + right
+
+        # no special tokens found, we can fall back
+        text = self.helper_decode(tokens, token_ids, delimiter)
+        if self.add_prefix_space:
+            assert text.startswith(' ')
+            text = text.lstrip(' ')
         return text
 
     @abstractmethod
@@ -217,6 +256,18 @@ class BPEHelper(ABC):
         :param dict_agent:
             agent with which we are syncing the dictionary
         """
+
+    def add_special_tokens(self, dict_agent, special_tokens: List[str]):
+        """
+        Add special tokens to the tokenizer.
+
+        These tokens are never split, and prioritized over the BPE tokenization.
+        """
+        # note, HF ByteLevelBPE tokenizer handles special tokens itself in
+        # a special way, so this will be skipped
+        for token in special_tokens:
+            # exploiting dictionaries' insertion ordering to emulate ordered sets
+            self._special_tokens[token] = 1
 
     def finalize(
         self, frequencies: Dict[str, int], num_symbols: int, minfreq: int
@@ -289,18 +340,20 @@ class SubwordBPEHelper(BPEHelper):
         """
         super().__init__(opt, shared)
         if not SUBWORD_BPE_INSTALLED:
-            raise RuntimeError(
-                "Please run \"pip install 'git+https://github.com/rsennrich"
-                "/subword-nmt.git#egg=subword-nmt'\""
-            )
+            raise RuntimeError("Please run `pip install subword-nmt`")
         if not opt.get('dict_file'):
             raise RuntimeError('--dict-file is mandatory.')
 
         self.splitter = re.compile(r'\w+|[^\w\s]', re.UNICODE)
 
         self.codecs = f"{opt['dict_file']}.codecs"
-        if os.path.exists(self.codecs):
+        if PathManager.exists(self.codecs):
             self._load_from_codecs()
+
+    def add_special_tokens(self, dict_agent, special_tokens: List[str]):
+        raise NotImplementedError(
+            "--dict-tokenizer BPE does not support special tokens."
+        )
 
     def helper_encode(self, text: str) -> List[str]:
         """
@@ -377,8 +430,8 @@ class SubwordBPEHelper(BPEHelper):
             minfreq = 2
 
         codec_dir, _ = os.path.split(self.codecs)
-        os.makedirs(codec_dir, exist_ok=True)
-        with open(self.codecs, 'w', encoding='utf-8') as outstream:
+        PathManager.mkdirs(codec_dir)
+        with PathManager.open(self.codecs, 'w', encoding='utf-8') as outstream:
             learn_bpe.learn_bpe(
                 dictionary,
                 outstream,
@@ -394,7 +447,7 @@ class SubwordBPEHelper(BPEHelper):
         """
         Load BPE from codecs file.
         """
-        with open(self.codecs, 'r', encoding='utf-8') as codecs_file:
+        with PathManager.open(self.codecs, 'r', encoding='utf-8') as codecs_file:
             self.bpe = apply_bpe.BPE(codecs_file)
 
     def copy_codecs_file(self, target_file: str):
@@ -404,8 +457,8 @@ class SubwordBPEHelper(BPEHelper):
         :param target_file:
             where to copy the codecs.
         """
-        with open(target_file, 'w', encoding='utf-8') as wfile:
-            with open(self.codecs, encoding='utf-8') as rfile:
+        with PathManager.open(target_file, 'w', encoding='utf-8') as wfile:
+            with PathManager.open(self.codecs, encoding='utf-8') as rfile:
                 for line in rfile:
                     wfile.write(line)
 
@@ -465,14 +518,14 @@ class Gpt2BpeHelper(BPEHelper):
                 ' (no --dict-minfreq or --dict-maxtokens).'
             )
 
-        bpe_data, json_path = self._build_data()
+        self.bpe_data, self.json_path, self.merge_path = self._build_data()
 
         # build encoder & decoder
-        self.encoder: Dict[str, str] = self._build_encoder(json_path)
+        self.encoder: Dict[str, str] = self._build_encoder(self.json_path)
         self.decoder: Dict[str, str] = {v: k for k, v in self.encoder.items()}
 
         bpe_merges = [
-            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
+            tuple(merge_str.split()) for merge_str in self.bpe_data.split('\n')[1:-1]
         ]
         self.byte_encoder = self.bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
@@ -502,14 +555,14 @@ class Gpt2BpeHelper(BPEHelper):
         data_path = os.path.join(self.opt['datapath'], 'gpt2')
         vocab_path = os.path.join(data_path, 'vocab.bpe')
         json_path = os.path.join(data_path, 'encoder.json')
-        if not os.path.isfile(vocab_path) or not os.path.isfile(json_path):
+        if not PathManager.exists(vocab_path) or not PathManager.exists(json_path):
             make_dir(data_path)
             download(self.DEFAULT_VOCAB_BPE, data_path, 'vocab.bpe')
             download(self.DEFAULT_ENCODER_JSON, data_path, 'encoder.json')
-        with open(vocab_path, 'r', encoding="utf-8") as f:
+        with PathManager.open(vocab_path, 'r', encoding="utf-8") as f:
             bpe_data = f.read()
 
-        return bpe_data, json_path
+        return bpe_data, json_path, vocab_path
 
     def _build_encoder(self, json_path: str) -> Dict[str, str]:
         """
@@ -521,7 +574,7 @@ class Gpt2BpeHelper(BPEHelper):
         :return:
             encoder, mapping tokens to unicode reps
         """
-        with open(json_path, 'r', encoding='utf8') as f:
+        with PathManager.open(json_path, 'r', encoding='utf8') as f:
             encoder = json.load(f)
         for each_token in encoder.keys():
             new_token = ''.join(
@@ -572,14 +625,31 @@ class Gpt2BpeHelper(BPEHelper):
         :return pairs:
             set of tuples of symbols
         """
-        pairs = set()
+        pairs = []
         prev_char = word[0]
         for char in word[1:]:
-            pairs.add((prev_char, char))
+            pairs.append((prev_char, char))
             prev_char = char
         return pairs
 
-    @lru_cache(maxsize=10240)
+    def _dropout_pairs(self, pairs):
+        """
+        Implements BPE dropout (Provlikov et al., 2019).
+
+        https://arxiv.org/abs/1910.13267
+
+        Randomly removes merges from the list of possible merges. This can
+        result in different subwords being used to realized the same string,
+        and effectively regularizes representations.
+        """
+        if not self.bpe_dropout or not self._bpe_dropout_enabled:
+            return pairs
+
+        dropped_pairs = [p for p in pairs if random.random() > self.bpe_dropout]
+        if not dropped_pairs:
+            dropped_pairs = [random.choice(pairs)]
+        return dropped_pairs
+
     def bpe(self, token: str) -> str:
         """
         Convert token to BPE.
@@ -597,7 +667,10 @@ class Gpt2BpeHelper(BPEHelper):
             return token
 
         while True:
-            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            dropped_pairs = self._dropout_pairs(pairs)
+            bigram = min(
+                dropped_pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf'))
+            )
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -680,6 +753,26 @@ class Gpt2BpeHelper(BPEHelper):
             dict_agent.add_token(each_token)
             dict_agent.freq[each_token] = 1
 
+    def save(self, dir_name: str, file_name: str):
+        """
+        Save appropriate files.
+
+        :param dir_name:
+            directory to save.
+        :param file_name:
+            file to save.
+        """
+        out_json_path = os.path.join(dir_name, file_name + "-vocab.json")
+        out_merge_path = os.path.join(dir_name, file_name + "-merges.txt")
+        # Possibly bad assumption: if the destination file already exists,
+        # we don't need to copy it over again.
+        if not PathManager.exists(out_json_path):
+            logging.info(f"Copying {self.json_path} to {out_json_path}")
+            PathManager.copy(self.json_path, out_json_path)
+        if not PathManager.exists(out_merge_path):
+            logging.info(f"Copying {self.merge_path} to {out_merge_path}")
+            PathManager.copy(self.merge_path, out_merge_path)
+
 
 ###################
 # HuggingFace BPE #
@@ -698,20 +791,26 @@ class HuggingFaceBpeHelper(BPEHelper):
         # Default true for HF
         self.special_tok_map = {}  # map from HF
         self.add_prefix_space = opt.get('bpe_add_prefix_space', True)
-        self.skip_special_tokens = opt.get('hf_skip_special_tokens', True)
         if self.add_prefix_space is None:
             self.add_prefix_space = True
         if opt.get('dict_loaded'):
             dfname = opt['dict_file']
-            if os.path.isfile(f'{dfname}-merges.txt'):
+            if PathManager.exists(f'{dfname}-merges.txt'):
                 opt['bpe_merge'] = f'{dfname}-merges.txt'
-            if os.path.isfile(f'{dfname}-vocab.json'):
+            if PathManager.exists(f'{dfname}-vocab.json'):
                 opt['bpe_vocab'] = f'{dfname}-vocab.json'
         try:
             from tokenizers import ByteLevelBPETokenizer
         except ImportError:
             raise ImportError(
                 'Please install HuggingFace tokenizer with: pip install tokenizers'
+            )
+
+        if self.bpe_dropout:
+            raise NotImplementedError(
+                '--bpe-dropout is not supported with ByteLevelBPE because tokenizers '
+                'library does not allow dynamically turning BPE on/off. You can use '
+                '--dict-tokenizer slow_bytelevel_bpe to gain this feature.'
             )
 
         if self.lower:
@@ -735,11 +834,11 @@ class HuggingFaceBpeHelper(BPEHelper):
                 '--dict-tokenizer bytelevelbpe'
             )
 
-        if not os.path.isfile(self.vocab_path):
+        if not PathManager.exists(self.vocab_path):
             raise IOError(
                 f'File {self.vocab_path} does not exist. --bpe-vocab must be pretrained.'
             )
-        if not os.path.isfile(self.merge_path):
+        if not PathManager.exists(self.merge_path):
             raise IOError(
                 f'File {self.merge_path} does not exist. --bpe-merge must be pretrained.'
             )
@@ -778,9 +877,7 @@ class HuggingFaceBpeHelper(BPEHelper):
         :return text:
             decoded text
         """
-        text = self.tokenizer.decode(
-            token_ids, skip_special_tokens=self.skip_special_tokens
-        )
+        text = self.tokenizer.decode(token_ids, skip_special_tokens=False)
 
         return text
 
@@ -826,7 +923,7 @@ class HuggingFaceBpeHelper(BPEHelper):
         :param file_name:
             file to save.
         """
-        self.tokenizer.save(dir_name, file_name)
+        self.tokenizer.save_model(dir_name, file_name)
 
 
 class SlowBytelevelBPE(Gpt2BpeHelper):
@@ -849,18 +946,18 @@ class SlowBytelevelBPE(Gpt2BpeHelper):
         vocab_path = ''
         if self.opt.get('dict_loaded'):
             dfname = self.opt['dict_file']
-            if os.path.isfile(f'{dfname}-merges.txt'):
+            if PathManager.exists(f'{dfname}-merges.txt'):
                 vocab_path = f'{dfname}-merges.txt'
-            if os.path.isfile(f'{dfname}-vocab.json'):
+            if PathManager.exists(f'{dfname}-vocab.json'):
                 json_path = f'{dfname}-vocab.json'
 
-        if os.path.isfile(vocab_path) and os.path.isfile(json_path):
-            with open(vocab_path, 'r', encoding="utf-8") as f:
+        if PathManager.exists(vocab_path) and PathManager.exists(json_path):
+            with PathManager.open(vocab_path, 'r', encoding="utf-8") as f:
                 bpe_data = f.read()
         else:
-            bpe_data, json_path = super()._build_data()
+            return super()._build_data()
 
-        return bpe_data, json_path
+        return bpe_data, json_path, vocab_path
 
     def sync_with_dict(self, dict_agent):
         """
