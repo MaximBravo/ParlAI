@@ -32,7 +32,7 @@ class MessengerBotChatTaskWorld(World):
     # os.environ["CUDA_VISIBLE_DEVICES"]="" # uncomment to force CPU
 
     MAX_AGENTS = 1
-    MODEL_KEY = 'blender_3B' #'blender_90M'
+    MODEL_KEY = 'blender_1Bdistill' #'blender_90M'
 
     def __init__(self, opt, agent, bot):
         self.agent = agent
