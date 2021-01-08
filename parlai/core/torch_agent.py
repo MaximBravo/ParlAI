@@ -227,6 +227,7 @@ class History(object):
         return self.dict.txt2vec(text)
 
     def generate_history_vecs(self):
+        self.history_vecs = []
         for turn in self.history_strings:
             self.history_vecs.append(self.dict.txt2vec(turn))
 
